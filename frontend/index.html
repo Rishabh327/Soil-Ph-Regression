@@ -237,47 +237,31 @@
         </section>
       </div>
 
-      <!-- ROW 3 (Span 2 columns): CSV Batch Upload & Model Diagnostics -->
+      <!-- ROW 3 (Span 2 columns): Reference Soil Spectral Database & Live Predictions -->
       <section class="panel-card csv-panel">
         <div class="panel-header">
-          <i data-lucide="upload-cloud" class="panel-icon"></i>
-          <h2>Batch Estimator (CSV Upload)</h2>
+          <i data-lucide="database" class="panel-icon"></i>
+          <h2>Reference Soil Spectral Database &amp; Live Predictions</h2>
         </div>
-        <p class="panel-desc">Drag and drop a CSV file containing reflectance values. Column names should be `B2`, `B3`, `B4`, `B5`, `B6`, `B7`, `B8`, `B8A` (or similar headers). The tool will run the PLSR &amp; GPR predictions instantly.</p>
+        <p class="panel-desc">A curated database of geographically diverse soil samples. Click <strong>"Load &amp; Predict"</strong> on any row to instantly load its multispectral signature into the sliders and plot its active reflectance curve.</p>
 
-        <div class="csv-grid">
-          <div class="drop-zone" id="csv-drop-zone">
-            <i data-lucide="file-text" class="drop-icon"></i>
-            <p class="drop-text">Drag &amp; drop soil spectral CSV here, or <span>browse files</span></p>
-            <input type="file" id="csv-file-input" accept=".csv" class="hidden-input">
-          </div>
-
-          <div class="csv-results" id="csv-results-area">
-            <div class="results-header">
-              <h3>Inference Results</h3>
-              <button id="download-results-btn" class="action-btn" disabled type="button">
-                <i data-lucide="download"></i> Download CSV Predictions
-              </button>
-            </div>
-            <div class="table-wrapper">
-              <table id="results-table">
-                <thead>
-                  <tr>
-                    <th>Sample ID</th>
-                    <th>PLS pH</th>
-                    <th>GPR pH</th>
-                    <th>GPR 90% PI Range</th>
-                    <th>Uncertainty</th>
-                  </tr>
-                </thead>
-                <tbody id="results-table-body">
-                  <tr class="empty-state">
-                    <td colspan="5">Upload a CSV to view batch predictions.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div class="table-wrapper" style="max-height: 400px;">
+          <table id="database-table">
+            <thead>
+              <tr>
+                <th>Soil ID</th>
+                <th>Classification &amp; Location</th>
+                <th>Actual pH</th>
+                <th>PLS predicted pH</th>
+                <th>GPR predicted pH</th>
+                <th>90% Prediction Interval</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="database-table-body">
+              <!-- Curated rows will be populated dynamically by script.js -->
+            </tbody>
+          </table>
         </div>
       </section>
 

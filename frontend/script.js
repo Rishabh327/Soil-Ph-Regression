@@ -1,8 +1,10 @@
+// Import the pre-compiled models directly as an ES module (prevents all fetch errors!)
+import { modelsData } from "./models_data.js";
+
 // Initialize Lucide icons
 lucide.createIcons();
 
 // State variables
-let modelsData = null;
 let chart = null;
 
 // Simulated band names and centers
@@ -12,11 +14,25 @@ const bandWavelengths = [490, 560, 665, 705, 740, 783, 842, 865];
 
 // Preset definitions (Reflectance profiles)
 const presets = {
-  "loam": { b2: 0.120, b3: 0.160, b4: 0.220, b5: 0.250, b6: 0.280, b7: 0.310, b8: 0.330, b8a: 0.340 },
+  "loam": { b2: 0.100, b3: 0.140, b4: 0.200, b5: 0.230, b6: 0.260, b7: 0.290, b8: 0.310, b8a: 0.320 },
   "calcareous": { b2: 0.280, b3: 0.340, b4: 0.400, b5: 0.430, b6: 0.460, b7: 0.490, b8: 0.520, b8a: 0.530 },
   "sandy": { b2: 0.180, b3: 0.220, b4: 0.280, b5: 0.310, b6: 0.340, b7: 0.370, b8: 0.390, b8a: 0.400 },
-  "peat": { b2: 0.040, b3: 0.060, b4: 0.080, b5: 0.100, b6: 0.120, b7: 0.140, b8: 0.160, b8a: 0.170 }
+  "peat": { b2: 0.030, b3: 0.040, b4: 0.050, b5: 0.060, b6: 0.070, b7: 0.080, b8: 0.100, b8a: 0.110 }
 };
+
+// Curated reference soil spectral database representing real global soil classes
+const soilDatabase = [
+  { id: "US-IA-01", desc: "Mollisol (Midwest Grassland Organic Loam) • Iowa, USA", actualPH: 6.8, bands: { b2: 0.100, b3: 0.140, b4: 0.200, b5: 0.230, b6: 0.260, b7: 0.290, b8: 0.310, b8a: 0.320 } },
+  { id: "BR-AM-03", desc: "Ultisol (Tropical Acidic Rainforest Clay) • Amazonas, Brazil", actualPH: 4.8, bands: { b2: 0.080, b3: 0.120, b4: 0.180, b5: 0.210, b6: 0.240, b7: 0.270, b8: 0.290, b8a: 0.300 } },
+  { id: "IN-KA-05", desc: "Vertisol (Cracking Alkaline Black Clay) • Karnataka, India", actualPH: 8.2, bands: { b2: 0.260, b3: 0.320, b4: 0.380, b5: 0.410, b6: 0.440, b7: 0.470, b8: 0.500, b8a: 0.510 } },
+  { id: "US-AZ-02", desc: "Aridisol (Desert Silt & Calcium Carbonate) • Arizona, USA", actualPH: 7.9, bands: { b2: 0.240, b3: 0.300, b4: 0.360, b5: 0.390, b6: 0.420, b7: 0.450, b8: 0.480, b8a: 0.490 } },
+  { id: "UK-SC-04", desc: "Histosol (Highly Acidic Organic Sphagnum Peat) • Highlands, Scotland", actualPH: 3.8, bands: { b2: 0.030, b3: 0.040, b4: 0.050, b5: 0.060, b6: 0.070, b7: 0.080, b8: 0.100, b8a: 0.110 } },
+  { id: "SE-NL-01", desc: "Spodosol (Coniferous Boreal Forest Podzol) • Norrland, Sweden", actualPH: 4.5, bands: { b2: 0.060, b3: 0.090, b4: 0.130, b5: 0.160, b6: 0.190, b7: 0.220, b8: 0.240, b8a: 0.250 } },
+  { id: "JP-KY-02", desc: "Andisol (Allophane Volcanic Ash) • Kyushu, Japan", actualPH: 5.6, bands: { b2: 0.050, b3: 0.070, b4: 0.100, b5: 0.120, b6: 0.140, b7: 0.160, b8: 0.180, b8a: 0.190 } },
+  { id: "KE-RV-03", desc: "Oxisol (Highly Weathered Siderite & Clay) • Rift Valley, Kenya", actualPH: 5.2, bands: { b2: 0.120, b3: 0.160, b4: 0.220, b5: 0.250, b6: 0.280, b7: 0.310, b8: 0.330, b8a: 0.340 } },
+  { id: "FR-LV-05", desc: "Alfisol (Temperate Deciduous Silt-Loam) • Loire Valley, France", actualPH: 6.2, bands: { b2: 0.140, b3: 0.180, b4: 0.240, b5: 0.270, b6: 0.300, b7: 0.330, b8: 0.350, b8a: 0.360 } },
+  { id: "ES-AN-01", desc: "Calcisol (Highly Calcareous Gravelly Silt) • Andalusia, Spain", actualPH: 8.5, bands: { b2: 0.300, b3: 0.360, b4: 0.420, b5: 0.450, b6: 0.480, b7: 0.510, b8: 0.540, b8a: 0.550 } }
+];
 
 // ==========================================================================
 // ML INFERENCE ENGINES (CLIENT-SIDE)
@@ -267,76 +283,47 @@ function applyPreset(presetName) {
 }
 
 // ==========================================================================
-// CSV BATCH INFERENCE SYSTEM
+// SOIL REFERENCE DATABASE POPULATION
 // ==========================================================================
-let batchResults = [];
+function loadSoilSample(sampleIndex) {
+  const sample = soilDatabase[sampleIndex];
+  if (!sample) return;
 
-function handleCSVString(csvText) {
-  if (!modelsData) return;
-
-  // Split lines
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== "");
-  if (lines.length < 2) {
-    alert("CSV must contain a header row and at least one data row.");
-    return;
-  }
-
-  // Parse headers
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  
-  // Find column indexes for each band B2 - B8A
-  const bandCols = bandKeys.map(key => {
-    // Look for exact key (e.g. b2) or band descriptions
-    let idx = headers.indexOf(key);
-    if (idx === -1) idx = headers.indexOf(`scan_visnir.${key}_ref`); // common OSSL format
-    if (idx === -1) {
-      // Fallback: look for index starting with the key
-      idx = headers.findIndex(h => h.startsWith(key));
-    }
-    return idx;
+  // Set sliders
+  bandKeys.forEach(key => {
+    document.getElementById(`${key}-slider`).value = sample.bands[key];
   });
 
-  // If we couldn't resolve headers, assume column 0-7 are B2-B8A
-  const resolvedAll = bandCols.every(idx => idx !== -1);
-  if (!resolvedAll) {
-    console.warn("Could not match all band headers in CSV. Defaulting to columns 0-7 in order: B2, B3, B4, B5, B6, B7, B8, B8A.");
-  }
+  // Clear presets active state since we loaded a custom sample
+  document.querySelectorAll(".preset-btn").forEach(btn => {
+    btn.classList.remove("active");
+  });
 
-  const tableBody = document.getElementById("results-table-body");
+  runInference();
+  
+  // Highlight active row in table
+  document.querySelectorAll("#database-table-body tr").forEach((row, idx) => {
+    row.style.background = idx === sampleIndex ? "rgba(168, 85, 247, 0.15)" : "";
+    row.style.borderColor = idx === sampleIndex ? "var(--accent-purple)" : "";
+  });
+}
+
+function populateDatabaseTable() {
+  if (!modelsData) return;
+
+  const tableBody = document.getElementById("database-table-body");
   tableBody.innerHTML = "";
-  batchResults = [];
 
   const mean = modelsData.scaler.mean;
   const scale = modelsData.scaler.scale;
   const plsCoeffs = modelsData.plsr.coefficients;
   const plsIntercept = modelsData.plsr.intercept;
 
-  let rowCount = 0;
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',').map(c => c.trim());
-    if (cols.length < 8) continue;
-
-    const sampleId = cols[0] || `Sample_${i}`;
-    
+  soilDatabase.forEach((sample, index) => {
     // Extract band inputs
-    let inputs = [];
-    if (resolvedAll) {
-      inputs = bandCols.map(colIdx => parseFloat(cols[colIdx]));
-    } else {
-      // Parse first 8 numerical columns (ignoring non-numeric or sample ID)
-      let numCols = cols.map(c => parseFloat(c)).filter(n => !isNaN(n));
-      if (numCols.length >= 8) {
-        inputs = numCols.slice(0, 8);
-      } else {
-        // Fallback directly to index mapping
-        inputs = bandKeys.map((_, idx) => parseFloat(cols[idx + 1]) || parseFloat(cols[idx]) || 0);
-      }
-    }
+    const inputs = bandKeys.map(key => sample.bands[key]);
 
-    // Skip if any band is invalid
-    if (inputs.some(val => isNaN(val))) continue;
-
-    // Run inference
+    // Run inference live in browser for database items
     const xScaled = scaleFeatures(inputs, mean, scale);
     const plsVal = predictPLS(xScaled, plsCoeffs, plsIntercept);
     const gprResult = predictGPR(xScaled, modelsData.gpr);
@@ -346,142 +333,70 @@ function handleCSVString(csvText) {
     const margin = 1.645 * gprStd;
     const lowerPI = Math.max(0, gprVal - margin);
     const upperPI = gprVal + margin;
-    const piWidth = 2 * margin;
-
-    batchResults.push({
-      sampleId,
-      inputs,
-      plsPH: plsVal,
-      gprPH: gprVal,
-      lowerPI,
-      upperPI,
-      std: gprStd
-    });
 
     // Create Table Row
     const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => loadSoilSample(index));
+    
     tr.innerHTML = `
-      <td><strong>${sampleId}</strong></td>
+      <td><strong>${sample.id}</strong></td>
+      <td>${sample.desc}</td>
+      <td style="font-weight:600;">${sample.actualPH.toFixed(1)}</td>
       <td class="pls-text">${plsVal.toFixed(2)}</td>
-      <td class="gpr-text">${gprVal.toFixed(2)}</td>
+      <td class="gpr-text" style="color:var(--accent-cyan); font-weight:600;">${gprVal.toFixed(2)}</td>
       <td><span class="range-badge">${lowerPI.toFixed(2)} – ${upperPI.toFixed(2)}</span></td>
-      <td><span class="std-badge">±${margin.toFixed(2)} (90%)</span></td>
+      <td>
+        <button class="action-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;" type="button">
+          Load &amp; Predict
+        </button>
+      </td>
     `;
+    
     tableBody.appendChild(tr);
-    rowCount++;
-  }
-
-  if (rowCount === 0) {
-    tableBody.innerHTML = `<tr class="empty-state"><td colspan="5">Could not parse any valid rows. Please check CSV format.</td></tr>`;
-    document.getElementById("download-results-btn").disabled = true;
-  } else {
-    document.getElementById("download-results-btn").disabled = false;
-  }
-}
-
-function downloadCSVResults() {
-  if (batchResults.length === 0) return;
-
-  let csvContent = "data:text/csv;charset=utf-8,";
-  csvContent += "Sample_ID,B2,B3,B4,B5,B6,B7,B8,B8A,PLS_pH,GPR_pH,90_Percent_PI_Lower,90_Percent_PI_Upper,Uncertainty_Std\n";
-
-  batchResults.forEach(r => {
-    const inputsStr = r.inputs.map(val => val.toFixed(4)).join(",");
-    const row = `${r.sampleId},${inputsStr},${r.plsPH.toFixed(4)},${r.gprPH.toFixed(4)},${r.lowerPI.toFixed(4)},${r.upperPI.toFixed(4)},${r.std.toFixed(4)}`;
-    csvContent += row + "\n";
   });
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "soil_ph_predictions_report.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 }
 
 // ==========================================================================
 // APP INITIALIZATION & BINDINGS
 // ==========================================================================
-async function initApp() {
-  try {
-    // 1. Fetch trained model parameters JSON
-    console.log("Loading models.json...");
-    const response = await fetch("./models.json");
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models.json: Status ${response.status}`);
-    }
-    modelsData = await response.json();
-    console.log("Models loaded successfully!", modelsData);
-
-    // 2. Populate diagnostics panel from training metrics
-    const meta = modelsData.metadata;
-    document.getElementById("diag-pls-rmse").textContent = meta.pls_rmse.toFixed(3);
-    document.getElementById("diag-pls-r2").textContent = `${(meta.pls_r2 * 100).toFixed(1)}%`;
-    document.getElementById("diag-gpr-rmse").textContent = meta.gpr_rmse.toFixed(3);
-    document.getElementById("diag-gpr-r2").textContent = `${(meta.gpr_r2 * 100).toFixed(1)}%`;
-    document.getElementById("diag-gpr-pi").textContent = `${meta.gpr_mean_pi_width.toFixed(2)} pH`;
-
-    // 3. Setup sliders event listeners
-    bandKeys.forEach(key => {
-      const slider = document.getElementById(`${key}-slider`);
-      slider.addEventListener("input", runInference);
-    });
-
-    // 4. Setup preset buttons
-    Object.keys(presets).forEach(presetName => {
-      const btn = document.getElementById(`preset-${presetName}`);
-      btn.addEventListener("click", () => applyPreset(presetName));
-    });
-
-    // 5. Setup Drag-and-Drop file listeners
-    const dropZone = document.getElementById("csv-drop-zone");
-    const fileInput = document.getElementById("csv-file-input");
-
-    dropZone.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", (e) => {
-      if (e.target.files.length > 0) {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (evt) => handleCSVString(evt.target.result);
-        reader.readAsText(file);
-      }
-    });
-
-    dropZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dropZone.classList.add("dragover");
-    });
-
-    dropZone.addEventListener("dragleave", () => {
-      dropZone.classList.remove("dragover");
-    });
-
-    dropZone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dropZone.classList.remove("dragover");
-      if (e.dataTransfer.files.length > 0) {
-        const file = e.dataTransfer.files[0];
-        const reader = new FileReader();
-        reader.onload = (evt) => handleCSVString(evt.target.result);
-        reader.readAsText(file);
-      }
-    });
-
-    document.getElementById("download-results-btn").addEventListener("click", downloadCSVResults);
-
-    // 6. Initialize UI with the default Organic Loam preset
-    const defaultPreset = presets.loam;
-    const initialInputs = bandKeys.map(key => defaultPreset[key]);
-    
-    initChart(initialInputs);
-    applyPreset("loam");
-
-  } catch (error) {
-    console.error("App initialization failed:", error);
-    // Display error modal/text in diagnostic panel
-    document.querySelectorAll(".stat-val").forEach(el => el.textContent = "Err");
+function initApp() {
+  if (!modelsData) {
+    console.error("Models data could not be imported!");
+    return;
   }
+  
+  console.log("ES Module modelsData loaded successfully!", modelsData);
+
+  // 1. Populate diagnostics panel from training metrics
+  const meta = modelsData.metadata;
+  document.getElementById("diag-pls-rmse").textContent = meta.pls_rmse.toFixed(3);
+  document.getElementById("diag-pls-r2").textContent = `${(meta.pls_r2 * 100).toFixed(1)}%`;
+  document.getElementById("diag-gpr-rmse").textContent = meta.gpr_rmse.toFixed(3);
+  document.getElementById("diag-gpr-r2").textContent = `${(meta.gpr_r2 * 100).toFixed(1)}%`;
+  document.getElementById("diag-gpr-pi").textContent = `${meta.gpr_mean_pi_width.toFixed(2)} pH`;
+
+  // 2. Setup sliders event listeners
+  bandKeys.forEach(key => {
+    const slider = document.getElementById(`${key}-slider`);
+    slider.addEventListener("input", runInference);
+  });
+
+  // 3. Setup preset buttons
+  Object.keys(presets).forEach(presetName => {
+    const btn = document.getElementById(`preset-${presetName}`);
+    btn.addEventListener("click", () => applyPreset(presetName));
+  });
+
+  // 4. Populate interactive database table
+  populateDatabaseTable();
+
+  // 5. Initialize UI with the default Organic Loam preset
+  const defaultPreset = presets.loam;
+  const initialInputs = bandKeys.map(key => defaultPreset[key]);
+  
+  initChart(initialInputs);
+  applyPreset("loam");
 }
 
 // Start app

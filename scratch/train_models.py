@@ -205,7 +205,7 @@ print("Training Gaussian Process Regression...")
 # We select a representative training subset to make client-side prediction in JS super fast.
 # GPR scale is O(N^3) for training, and prediction is O(N) per test sample where N is number of training points.
 # 600 representative points is perfect: rich enough to capture non-linearities, small enough to run GPR in JS under 2ms.
-max_gpr_samples = 600
+max_gpr_samples = 150
 if len(X_train) > max_gpr_samples:
     # Use stratified or simple random sampling to get a highly representative subset
     idx = np.random.choice(len(X_train), max_gpr_samples, replace=False)
@@ -342,10 +342,12 @@ export_data = {
     }
 }
 
-# Save model parameters to JSON
-model_json_path = "frontend/public/models.json"
-with open(model_json_path, 'w') as f:
+# Save model parameters to JS file as an ES module
+model_js_path = "frontend/models_data.js"
+with open(model_js_path, 'w') as f:
+    f.write("export const modelsData = ")
     json.dump(export_data, f)
+    f.write(";\n")
     
-print(f"\nModel parameters successfully saved to {model_json_path}")
+print(f"\nModel parameters successfully saved to {model_js_path}")
 print("--- Machine Learning Pipeline Finished Successfully ---")
