@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soil pH Regression from Spectral Reflectance</title>
+  <meta name="description" content="Predict soil pH from visible-NIR reflectance bands simulated from multispectral data. Compare Partial Least Squares Regression (PLSR) with Gaussian Process Regression (GPR).">
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- ChartJS -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <i data-lucide="leaf" class="header-icon"></i>
+        <h1>SoilSpec<span>Predict</span></h1>
+      </div>
+      <p class="tagline">Soil pH Regression from Simulated visible-NIR Multispectral Reflectance</p>
+      <div class="objective-badge">
+        <i data-lucide="award"></i> ML Project • PLS vs. Gaussian Process Comparison
+      </div>
+    </header>
+
+    <main class="dashboard-grid">
+      <!-- COLUMN 1: Inputs & Controls -->
+      <section class="panel-card input-panel">
+        <div class="panel-header">
+          <i data-lucide="sliders" class="panel-icon"></i>
+          <h2>Spectral Input Bands</h2>
+        </div>
+        <p class="panel-desc">Simulate Sentinel-2 Multispectral bands (reflectance range: 0.0 - 1.0)</p>
+
+        <!-- Band Sliders Grid -->
+        <div class="sliders-grid">
+          <!-- B2 Blue -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B2 (Blue) <span class="wavelength">490nm</span></span>
+              <span id="b2-val" class="slider-val">0.120</span>
+            </div>
+            <input type="range" id="b2-slider" min="0" max="1" step="0.001" value="0.120" class="spectral-slider">
+          </div>
+
+          <!-- B3 Green -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B3 (Green) <span class="wavelength">560nm</span></span>
+              <span id="b3-val" class="slider-val">0.160</span>
+            </div>
+            <input type="range" id="b3-slider" min="0" max="1" step="0.001" value="0.160" class="spectral-slider">
+          </div>
+
+          <!-- B4 Red -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B4 (Red) <span class="wavelength">665nm</span></span>
+              <span id="b4-val" class="slider-val">0.220</span>
+            </div>
+            <input type="range" id="b4-slider" min="0" max="1" step="0.001" value="0.220" class="spectral-slider">
+          </div>
+
+          <!-- B5 Red Edge 1 -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B5 (Red Edge 1) <span class="wavelength">705nm</span></span>
+              <span id="b5-val" class="slider-val">0.250</span>
+            </div>
+            <input type="range" id="b5-slider" min="0" max="1" step="0.001" value="0.250" class="spectral-slider">
+          </div>
+
+          <!-- B6 Red Edge 2 -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B6 (Red Edge 2) <span class="wavelength">740nm</span></span>
+              <span id="b6-val" class="slider-val">0.280</span>
+            </div>
+            <input type="range" id="b6-slider" min="0" max="1" step="0.001" value="0.280" class="spectral-slider">
+          </div>
+
+          <!-- B7 Red Edge 3 -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B7 (Red Edge 3) <span class="wavelength">783nm</span></span>
+              <span id="b7-val" class="slider-val">0.310</span>
+            </div>
+            <input type="range" id="b7-slider" min="0" max="1" step="0.001" value="0.310" class="spectral-slider">
+          </div>
+
+          <!-- B8 NIR Broad -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B8 (NIR Broad) <span class="wavelength">842nm</span></span>
+              <span id="b8-val" class="slider-val">0.330</span>
+            </div>
+            <input type="range" id="b8-slider" min="0" max="1" step="0.001" value="0.330" class="spectral-slider">
+          </div>
+
+          <!-- B8A NIR Narrow -->
+          <div class="slider-group">
+            <div class="slider-label">
+              <span class="band-name">B8A (NIR Narrow) <span class="wavelength">865nm</span></span>
+              <span id="b8a-val" class="slider-val">0.340</span>
+            </div>
+            <input type="range" id="b8a-slider" min="0" max="1" step="0.001" value="0.340" class="spectral-slider">
+          </div>
+        </div>
+
+        <!-- Soil Profile Presets -->
+        <div class="presets-section">
+          <h3><i data-lucide="layers"></i> Quick Soil Presets</h3>
+          <div class="presets-grid">
+            <button class="preset-btn active" id="preset-loam" type="button">
+              <span class="preset-title">Organic Loam</span>
+              <span class="preset-desc">Neutral pH ~6.8</span>
+            </button>
+            <button class="preset-btn" id="preset-calcareous" type="button">
+              <span class="preset-title">Calcareous Clay</span>
+              <span class="preset-desc">Alkaline pH ~8.2</span>
+            </button>
+            <button class="preset-btn" id="preset-sandy" type="button">
+              <span class="preset-title">Sandy Forest</span>
+              <span class="preset-desc">Acidic pH ~5.2</span>
+            </button>
+            <button class="preset-btn" id="preset-peat" type="button">
+              <span class="preset-title">Acidic Peat</span>
+              <span class="preset-desc">Highly Acidic pH ~4.2</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- COLUMN 2: Predictions & Visualizations -->
+      <div class="results-column">
+        <!-- Core Predictions Panel -->
+        <section class="panel-card prediction-panel">
+          <div class="panel-header">
+            <i data-lucide="activity" class="panel-icon"></i>
+            <h2>Model Regression Results</h2>
+          </div>
+
+          <div class="prediction-cards-container">
+            <!-- GPR Prediction Card -->
+            <div class="pred-card gpr-theme">
+              <div class="pred-card-header">
+                <h3>Gaussian Process Regression (GPR)</h3>
+                <span class="badge">Non-Linear • Uncertainty</span>
+              </div>
+              <div class="pred-value-display">
+                <span id="gpr-pred-val" class="pred-val">6.80</span>
+                <span class="pred-unit">pH</span>
+              </div>
+              <!-- Uncertainty metrics -->
+              <div class="gpr-metrics">
+                <div class="gpr-metric">
+                  <span class="metric-lbl">90% Prediction Interval</span>
+                  <span id="gpr-pi-range" class="metric-val">6.25 – 7.35</span>
+                </div>
+                <div class="gpr-metric">
+                  <span class="metric-lbl">Interval Width</span>
+                  <span id="gpr-pi-width" class="metric-val">1.10 pH</span>
+                </div>
+              </div>
+              <!-- Visual prediction interval bar -->
+              <div class="interval-visualizer">
+                <div class="interval-bar-bg">
+                  <div id="gpr-pi-span" class="interval-bar-span" style="left: 40%; width: 20%;"></div>
+                  <div id="gpr-pi-marker" class="interval-marker" style="left: 50%;"></div>
+                </div>
+                <div class="interval-labels">
+                  <span>Acidic</span>
+                  <span>Neutral</span>
+                  <span>Alkaline</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- PLS Prediction Card -->
+            <div class="pred-card pls-theme">
+              <div class="pred-card-header">
+                <h3>Partial Least Squares (PLSR)</h3>
+                <span class="badge">Linear Projective</span>
+              </div>
+              <div class="pred-value-display">
+                <span id="pls-pred-val" class="pred-val">6.72</span>
+                <span class="pred-unit">pH</span>
+              </div>
+              <div class="pls-metrics">
+                <div class="pls-metric">
+                  <span class="metric-lbl">Residual comparison to GPR</span>
+                  <span id="pls-gpr-diff" class="metric-val">0.08 pH</span>
+                </div>
+              </div>
+              <div class="meter-bar-container">
+                <div class="meter-bar-bg">
+                  <div id="pls-marker" class="meter-marker" style="left: 67%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Color-Coded pH Spectrum Gauge -->
+          <div class="ph-gauge-section">
+            <h3>Predicted Soil pH Classification</h3>
+            <div class="ph-spectrum">
+              <div class="ph-color ph-4" data-ph="4">4</div>
+              <div class="ph-color ph-5" data-ph="5">5</div>
+              <div class="ph-color ph-6" data-ph="6">6</div>
+              <div class="ph-color ph-7" data-ph="7">7</div>
+              <div class="ph-color ph-8" data-ph="8">8</div>
+              <div class="ph-color ph-9" data-ph="9">9</div>
+            </div>
+            <div class="ph-classification">
+              Status: <span id="ph-class-text">Neutral Soil</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Interactive Spectra Plot -->
+        <section class="panel-card chart-panel">
+          <div class="panel-header">
+            <i data-lucide="line-chart" class="panel-icon"></i>
+            <h2>Spectral Reflectance Profile</h2>
+          </div>
+          <div class="chart-container">
+            <canvas id="spectra-chart"></canvas>
+          </div>
+        </section>
+      </div>
+
+      <!-- ROW 3 (Span 2 columns): CSV Batch Upload & Model Diagnostics -->
+      <section class="panel-card csv-panel">
+        <div class="panel-header">
+          <i data-lucide="upload-cloud" class="panel-icon"></i>
+          <h2>Batch Estimator (CSV Upload)</h2>
+        </div>
+        <p class="panel-desc">Drag and drop a CSV file containing reflectance values. Column names should be `B2`, `B3`, `B4`, `B5`, `B6`, `B7`, `B8`, `B8A` (or similar headers). The tool will run the PLSR &amp; GPR predictions instantly.</p>
+
+        <div class="csv-grid">
+          <div class="drop-zone" id="csv-drop-zone">
+            <i data-lucide="file-text" class="drop-icon"></i>
+            <p class="drop-text">Drag &amp; drop soil spectral CSV here, or <span>browse files</span></p>
+            <input type="file" id="csv-file-input" accept=".csv" class="hidden-input">
+          </div>
+
+          <div class="csv-results" id="csv-results-area">
+            <div class="results-header">
+              <h3>Inference Results</h3>
+              <button id="download-results-btn" class="action-btn" disabled type="button">
+                <i data-lucide="download"></i> Download CSV Predictions
+              </button>
+            </div>
+            <div class="table-wrapper">
+              <table id="results-table">
+                <thead>
+                  <tr>
+                    <th>Sample ID</th>
+                    <th>PLS pH</th>
+                    <th>GPR pH</th>
+                    <th>GPR 90% PI Range</th>
+                    <th>Uncertainty</th>
+                  </tr>
+                </thead>
+                <tbody id="results-table-body">
+                  <tr class="empty-state">
+                    <td colspan="5">Upload a CSV to view batch predictions.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel: Model Performance Diagnostics -->
+      <section class="panel-card diagnostics-panel">
+        <div class="panel-header">
+          <i data-lucide="shield-check" class="panel-icon"></i>
+          <h2>Model Validation Metrics (Offline OSSL)</h2>
+        </div>
+        <p class="panel-desc">Calculated during offline validation using 20% independent test split on OSSL datasets.</p>
+        
+        <div class="metrics-comparison-grid">
+          <div class="stat-card">
+            <span class="stat-lbl">PLSR RMSE</span>
+            <span id="diag-pls-rmse" class="stat-val">---</span>
+            <span class="stat-note">Root Mean Squared Error</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-lbl">PLSR R² Score</span>
+            <span id="diag-pls-r2" class="stat-val">---</span>
+            <span class="stat-note">Variance Explained</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-lbl">GPR RMSE</span>
+            <span id="diag-gpr-rmse" class="stat-val">---</span>
+            <span class="stat-note">Root Mean Squared Error</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-lbl">GPR R² Score</span>
+            <span id="diag-gpr-r2" class="stat-val">---</span>
+            <span class="stat-note">Variance Explained</span>
+          </div>
+          <div class="stat-card wide-stat">
+            <span class="stat-lbl">GPR Avg. 90% PI Width</span>
+            <span id="diag-gpr-pi" class="stat-val">---</span>
+            <span class="stat-note">Average 90% confidence bounds width (pH units)</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>© 2026 Soil pH Regression from Spectral Reflectance • Developed for Soil Spectroscopy ML Project</p>
+      <p class="footer-links">Built with HTML5, CSS Glassmorphism, and client-side Web-GP/PLS Regressors</p>
+    </footer>
+  </div>
+
+  <script type="module" src="/script.js"></script>
+</body>
+</html>
